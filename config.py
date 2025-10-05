@@ -66,6 +66,12 @@ GOALKEEPER_METRICS = {
     'clean_sheets': 2.0,
     'clean_sheet_percentage': 1.8,
     'minutes_played': 0.1,
+    
+    # Match results (north star metrics)
+    'wins': 2.5,
+    'draws': 1.0,
+    'points_per_match': 3.0,  # 3 for win, 1 for draw, 0 for loss
+    'points_gained': 2.0,
 }
 
 # Machine learning parameters

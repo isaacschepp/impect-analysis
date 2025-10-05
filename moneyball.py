@@ -94,7 +94,7 @@ class GoalkeeperMoneyball:
         return self.scored_data
     
     def train_model(self, model_type: str = 'random_forest', 
-                   target_metric: str = 'clean_sheet_percentage') -> Dict[str, float]:
+                   target_metric: str = 'points_per_match') -> Dict[str, float]:
         """
         Train the machine learning model to predict ACTUAL SUCCESS
         
@@ -102,7 +102,11 @@ class GoalkeeperMoneyball:
         Instead of predicting a circular composite_score (which is based on the same 
         metrics we use as features), we predict REAL GAME OUTCOMES:
         
-        - clean_sheet_percentage (default): How often does the goalkeeper help keep 
+        - points_per_match (default, NORTH STAR): Average points per match
+          (3 for win, 1 for draw, 0 for loss). This is the ultimate measure of success -
+          does the goalkeeper help the team WIN games?
+        
+        - clean_sheet_percentage: How often does the goalkeeper help keep 
           a clean sheet? This is a TRUE measure of success - did they prevent goals?
         
         - goals_prevented: How many goals did they save beyond expectation? 
@@ -224,9 +228,26 @@ class GoalkeeperMoneyball:
         logger.info(f"IDENTIFYING TOP {n_targets} GOALKEEPER TARGETS FOR {target_year}")
         logger.info("=" * 80)
         
-        # Get data for target year
-        if target_year in TRAINING_ITERATIONS:
+        # Get data for target year from the already-loaded training data
+        if self.scored_data is not None and target_year in self.scored_data['year'].values:
+            target_data = self.scored_data[self.scored_data['year'] == target_year].copy()
+            logger.info(f"Using {len(target_data)} goalkeepers from {target_year} data")
+            
+            # Use model to identify targets
+            targets = self.predictor.identify_targets(target_data, n_targets)
+            
+            logger.info(f"\nTop {n_targets} targets identified:")
+            logger.info(targets.to_string())
+            
+            return targets
+        elif target_year in TRAINING_ITERATIONS:
+            # Fall back to fetching if not in loaded data
+            logger.info(f"Year {target_year} not in loaded data, attempting to fetch...")
             target_data = self.collector.collect_iteration_data(target_year)
+            
+            if target_data.empty:
+                logger.error(f"Failed to load data for {target_year}")
+                return pd.DataFrame()
             
             # Score the goalkeepers
             scored_target_data = self.scorer.score_goalkeepers(target_data)
@@ -242,22 +263,28 @@ class GoalkeeperMoneyball:
             logger.error(f"Year {target_year} not in training iterations")
             return pd.DataFrame()
     
-    def generate_report(self, success_metric: str = 'clean_sheet_percentage') -> Dict:
+    def generate_report(self, success_metric: str = 'points_per_match') -> Dict:
         """
         Generate comprehensive analysis report using data-driven methodology
         
         SUCCESS METRIC:
-        By default, the system predicts 'clean_sheet_percentage' - a real outcome
-        that shows how often a goalkeeper helps their team avoid conceding goals.
-        This is NOT a circular metric based on our input features; it's an actual
-        game result that answers: "Does doing X or Y actually help win games?"
+        By default, the system predicts 'points_per_match' - the ultimate north star metric
+        representing actual match results: 3 points for a win, 1 for a draw, 0 for a loss.
+        
+        This is the most direct measure of whether a goalkeeper's performance helps the team WIN.
+        
+        Alternative metrics:
+        - 'clean_sheet_percentage': Real outcome showing how often the goalkeeper avoids conceding
+        - 'goals_prevented': Expected goals prevented (shot-stopping value)
+        
+        All are ACTUAL GAME OUTCOMES, not circular metrics based on input features.
         
         If use_data_driven_weights is True (recommended), this uses a two-phase approach:
         Phase 1: Score with initial weights and train ML model to learn feature importance
         Phase 2: Re-score using ML-derived weights for final results
         
         Args:
-            success_metric: The outcome metric to predict (default: clean_sheet_percentage)
+            success_metric: The outcome metric to predict (default: points_per_match)
         
         Returns:
             Dictionary containing all analysis results
@@ -399,21 +426,30 @@ class GoalkeeperMoneyball:
         
         logger.info("All results exported successfully!")
     
-    def run_full_analysis(self, success_metric: str = 'clean_sheet_percentage'):
+    def run_full_analysis(self, success_metric: str = 'points_per_match'):
         """
         Run the complete moneyball analysis pipeline
         
         SUCCESS DEFINITION:
-        The system predicts real game outcomes (clean_sheet_percentage by default),
-        NOT a circular composite score. This answers: "What actions actually lead to success?"
+        The system predicts real game outcomes. By default, it uses 'points_per_match',
+        which represents the most direct measure of winning: 3 points for a win, 1 for a draw, 0 for a loss.
+        This is the ultimate north star metric - does the goalkeeper's performance actually help the team win games?
+        
+        Other options include:
+        - 'clean_sheet_percentage': How often the goalkeeper keeps a clean sheet
+        - 'goals_prevented': Expected goals prevented (shot-stopping value)
+        
+        All are REAL GAME OUTCOMES, not circular composite scores.
         
         Args:
-            success_metric: The outcome to predict (default: clean_sheet_percentage)
+            success_metric: The outcome to predict (default: points_per_match)
         """
         logger.info("\n" + "=" * 80)
         logger.info("USLC GOALKEEPER MONEYBALL SYSTEM")
         logger.info("100% Mathematical, Data-Driven Analysis")
         logger.info(f"SUCCESS METRIC: {success_metric} (REAL GAME OUTCOME)")
+        if success_metric == 'points_per_match':
+            logger.info("NORTH STAR: Points per match (3 for win, 1 for draw, 0 for loss)")
         if self.use_data_driven_weights:
             logger.info("Using ML-Derived Weights (NO SUBJECTIVE WEIGHTS)")
         logger.info("Training on ALL historical data: " + ", ".join(map(str, sorted(TRAINING_ITERATIONS.keys()))))
