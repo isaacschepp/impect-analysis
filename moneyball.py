@@ -93,24 +93,52 @@ class GoalkeeperMoneyball:
         
         return self.scored_data
     
-    def train_model(self, model_type: str = 'random_forest') -> Dict[str, float]:
+    def train_model(self, model_type: str = 'random_forest', 
+                   target_metric: str = 'clean_sheet_percentage') -> Dict[str, float]:
         """
-        Train the machine learning model
+        Train the machine learning model to predict ACTUAL SUCCESS
+        
+        SUCCESS DEFINITION:
+        Instead of predicting a circular composite_score (which is based on the same 
+        metrics we use as features), we predict REAL GAME OUTCOMES:
+        
+        - clean_sheet_percentage (default): How often does the goalkeeper help keep 
+          a clean sheet? This is a TRUE measure of success - did they prevent goals?
+        
+        - goals_prevented: How many goals did they save beyond expectation? 
+          (Expected goals against minus actual goals conceded)
+        
+        - goals_conceded_per_90: Direct measure of defensive success (lower is better)
+        
+        This approach answers: "What goalkeeper behaviors actually lead to winning outcomes?"
+        The ML model learns which metrics (saves, distribution, aerial ability, etc.) 
+        correlate with these real-world results.
         
         Args:
             model_type: Type of model to train
+            target_metric: The success metric to predict (should be a real outcome)
             
         Returns:
             Training metrics
         """
         logger.info("=" * 80)
         logger.info("TRAINING MACHINE LEARNING MODEL")
+        logger.info(f"SUCCESS METRIC: {target_metric}")
+        logger.info("This metric represents ACTUAL GAME OUTCOMES, not subjective scores")
         logger.info("=" * 80)
         
         if self.scored_data is None:
             self.score_goalkeepers()
         
-        metrics = self.predictor.train(self.scored_data, model_type=model_type)
+        # Check if target metric exists in data
+        if target_metric not in self.scored_data.columns:
+            logger.warning(f"Target metric '{target_metric}' not found in data")
+            logger.warning("Available metrics: " + ", ".join(self.scored_data.columns.tolist()[:20]))
+            logger.info("Falling back to composite_score (not ideal - circular dependency)")
+            target_metric = 'composite_score'
+        
+        metrics = self.predictor.train(self.scored_data, target_col=target_metric, 
+                                      model_type=model_type)
         
         logger.info("Model training metrics:")
         for metric_name, value in metrics.items():
@@ -214,19 +242,29 @@ class GoalkeeperMoneyball:
             logger.error(f"Year {target_year} not in training iterations")
             return pd.DataFrame()
     
-    def generate_report(self) -> Dict:
+    def generate_report(self, success_metric: str = 'clean_sheet_percentage') -> Dict:
         """
         Generate comprehensive analysis report using data-driven methodology
+        
+        SUCCESS METRIC:
+        By default, the system predicts 'clean_sheet_percentage' - a real outcome
+        that shows how often a goalkeeper helps their team avoid conceding goals.
+        This is NOT a circular metric based on our input features; it's an actual
+        game result that answers: "Does doing X or Y actually help win games?"
         
         If use_data_driven_weights is True (recommended), this uses a two-phase approach:
         Phase 1: Score with initial weights and train ML model to learn feature importance
         Phase 2: Re-score using ML-derived weights for final results
+        
+        Args:
+            success_metric: The outcome metric to predict (default: clean_sheet_percentage)
         
         Returns:
             Dictionary containing all analysis results
         """
         logger.info("=" * 80)
         logger.info("GENERATING COMPREHENSIVE REPORT")
+        logger.info(f"SUCCESS METRIC: {success_metric}")
         if self.use_data_driven_weights:
             logger.info("Using DATA-DRIVEN methodology (ML-derived weights)")
         else:
@@ -238,7 +276,8 @@ class GoalkeeperMoneyball:
             'feature_importance': None,
             'ml_weights': None,
             'top_performers_by_year': {},
-            'targets_2025': None
+            'targets_2025': None,
+            'success_metric': success_metric
         }
         
         # Load data
@@ -251,8 +290,8 @@ class GoalkeeperMoneyball:
             logger.info("=" * 80)
             self.score_goalkeepers(use_ml_weights=False)
             
-            # Train model to learn feature importance
-            report['training_metrics'] = self.train_model()
+            # Train model to learn feature importance using REAL SUCCESS METRIC
+            report['training_metrics'] = self.train_model(target_metric=success_metric)
             
             # Extract data-driven weights from ML model
             report['ml_weights'] = self.extract_ml_weights()
@@ -268,7 +307,7 @@ class GoalkeeperMoneyball:
         else:
             # Traditional approach with manual weights
             self.score_goalkeepers(use_ml_weights=False)
-            report['training_metrics'] = self.train_model()
+            report['training_metrics'] = self.train_model(target_metric=success_metric)
             report['feature_importance'] = self.analyze_feature_importance()
         
         # Top performers by year
@@ -303,6 +342,20 @@ class GoalkeeperMoneyball:
                 self.scored_data, 
                 'goalkeeper_scores_all_years.csv'
             )
+        
+        # Export success metric info
+        if report.get('success_metric'):
+            success_info = pd.DataFrame([{
+                'success_metric': report['success_metric'],
+                'description': 'The target variable the ML model predicts - represents ACTUAL GAME OUTCOMES',
+                'why_it_matters': 'This is not a circular composite score. It measures real success: clean sheets, goals prevented, etc.',
+                'interpretation': 'The model learns which goalkeeper actions correlate with this real outcome'
+            }])
+            success_info.to_csv(
+                os.path.join(OUTPUT_DIR, 'success_metric_explanation.csv'),
+                index=False
+            )
+            logger.info(f"Success metric explanation exported")
         
         # Export ML-derived weights if available
         if report.get('ml_weights') is not None:
@@ -346,26 +399,35 @@ class GoalkeeperMoneyball:
         
         logger.info("All results exported successfully!")
     
-    def run_full_analysis(self):
+    def run_full_analysis(self, success_metric: str = 'clean_sheet_percentage'):
         """
         Run the complete moneyball analysis pipeline
+        
+        SUCCESS DEFINITION:
+        The system predicts real game outcomes (clean_sheet_percentage by default),
+        NOT a circular composite score. This answers: "What actions actually lead to success?"
+        
+        Args:
+            success_metric: The outcome to predict (default: clean_sheet_percentage)
         """
         logger.info("\n" + "=" * 80)
         logger.info("USLC GOALKEEPER MONEYBALL SYSTEM")
         logger.info("100% Mathematical, Data-Driven Analysis")
+        logger.info(f"SUCCESS METRIC: {success_metric} (REAL GAME OUTCOME)")
         if self.use_data_driven_weights:
             logger.info("Using ML-Derived Weights (NO SUBJECTIVE WEIGHTS)")
         logger.info("Training on ALL historical data: " + ", ".join(map(str, sorted(TRAINING_ITERATIONS.keys()))))
         logger.info("=" * 80 + "\n")
         
         # Generate report
-        report = self.generate_report()
+        report = self.generate_report(success_metric=success_metric)
         
         # Export results
         self.export_results(report)
         
         logger.info("\n" + "=" * 80)
         logger.info("ANALYSIS COMPLETE!")
+        logger.info(f"Model trained to predict: {success_metric}")
         if self.use_data_driven_weights:
             logger.info("Weights were determined by the data, not subjective choices")
         logger.info("=" * 80 + "\n")

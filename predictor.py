@@ -70,20 +70,34 @@ class GoalkeeperPredictor:
         
         return X, y
     
-    def train(self, data: pd.DataFrame, target_col: str = 'composite_score',
+    def train(self, data: pd.DataFrame, target_col: str = 'clean_sheet_percentage',
              model_type: str = 'random_forest') -> Dict[str, float]:
         """
-        Train the machine learning model
+        Train the machine learning model to predict ACTUAL GAME OUTCOMES
+        
+        SUCCESS DEFINITION:
+        The model predicts 'clean_sheet_percentage' by default - a direct measure of 
+        how often a goalkeeper helps their team avoid conceding goals. This is a TRUE 
+        OUTCOME METRIC that reflects actual game impact, not a circular composite score.
+        
+        Alternative success metrics you can use:
+        - 'clean_sheet_percentage': % of games with no goals conceded (default, recommended)
+        - 'goals_prevented': Expected goals minus actual goals (shows shot-stopping value)
+        - 'goals_conceded_per_90': Fewer goals = better performance (negate for optimization)
+        
+        The ML model learns which goalkeeper actions (saves, distribution, aerial work, etc.)
+        actually correlate with these real outcomes, answering: "What behaviors lead to success?"
         
         Args:
             data: Training data with features and target
-            target_col: Name of column to predict
+            target_col: Name of column to predict (should be a real outcome metric)
             model_type: Type of model ('random_forest' or 'gradient_boosting')
             
         Returns:
             Dictionary with training metrics
         """
-        logger.info(f"Training {model_type} model...")
+        logger.info(f"Training {model_type} model to predict: {target_col}")
+        logger.info(f"SUCCESS METRIC: {target_col} measures actual game outcomes")
         
         # Prepare data
         X, y = self._prepare_features(data, target_col)
