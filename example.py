@@ -174,8 +174,16 @@ def example_5_full_analysis():
     for idx, row in report['feature_importance'].head(5).iterrows():
         print(f"  {row['feature']}: {row['importance']:.4f}")
     
+    print(f"\nTop 5 ML-Derived Weights (Data-Driven):")
+    if report.get('ml_weights'):
+        sorted_weights = sorted(report['ml_weights'].items(), 
+                               key=lambda x: x[1], reverse=True)[:5]
+        for metric, weight in sorted_weights:
+            print(f"  {metric}: {weight:.4f}")
+    
     print(f"\nResults exported to 'output/' directory")
     print("  - goalkeeper_scores_all_years.csv")
+    print("  - ml_derived_weights.csv (NEW - data-driven weights!)")
     print("  - feature_importance.csv")
     print("  - top_performers_YYYY.csv (for each year)")
     print("  - targets_2025.csv")
@@ -193,13 +201,21 @@ This example shows how to use the system with real Impect API data.
 
 IMPORTANT: This requires network access to the Impect API.
 
+NEW: The system now uses DATA-DRIVEN weights (ML feature importance)
+     instead of manual subjective weights!
+
 Code:
 -----
 
 from moneyball import GoalkeeperMoneyball
 
-# Initialize with fresh data from API (no cache)
-moneyball = GoalkeeperMoneyball(use_cache=False)
+# Initialize with data-driven weights (recommended)
+# This will:
+# 1. Load ALL historical data (2022-2025)
+# 2. Score with equal weights (no bias)
+# 3. Train ML model to learn feature importance
+# 4. Re-score using ML-derived weights
+moneyball = GoalkeeperMoneyball(use_cache=False, use_data_driven_weights=True)
 
 # Run complete analysis
 report = moneyball.run_full_analysis()
@@ -207,23 +223,22 @@ report = moneyball.run_full_analysis()
 # Access specific results
 training_metrics = report['training_metrics']
 feature_importance = report['feature_importance']
+ml_weights = report['ml_weights']  # NEW: Data-driven weights!
 top_performers = report['top_performers_by_year'][2025]
 targets = report['targets_2025']
 
-# Export results
+# Export results (includes ml_derived_weights.csv)
 moneyball.export_results(report)
 
-# Use the trained model for new predictions
-new_data = collector.collect_iteration_data(year=2026)
-scored_new_data = scorer.score_goalkeepers(new_data)
-predictions = predictor.predict(scored_new_data)
+# The ml_derived_weights.csv shows which metrics matter most
+# based on DATA, not human opinion!
 
 Note: When using real API data, the system will:
 1. Authenticate with Impect API using provided credentials
-2. Fetch data from all training iterations (2022-2025)
+2. Fetch data from ALL training iterations (2022-2025)
 3. Cache the data for faster subsequent runs
-4. Train the model on historical data
-5. Generate predictions and rankings
+4. Train the model on ALL historical data
+5. Generate predictions and rankings using data-driven weights
     """)
 
 
