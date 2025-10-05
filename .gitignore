@@ -34,6 +34,7 @@ ENV/
 
 # Data files
 data/cache/
+output/
 *.csv
 *.pkl
 *.pickle
