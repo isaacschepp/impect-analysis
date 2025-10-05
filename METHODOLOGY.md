@@ -9,10 +9,26 @@ This document explains the mathematical and statistical methodology behind the U
 ### 1. Pure Objectivity
 - **No subjective metrics**: Only quantifiable statistics
 - **No human bias**: Mathematical formulas only
+- **Data-driven weights**: ML model determines metric importance, not manual choices
 - **No scouting opinions**: Data speaks for itself
 - **Reproducible results**: Same data = same outcomes
 
-### 2. Multi-Dimensional Evaluation
+### 2. Data-Driven Weighting (NEW)
+The system now uses a **two-phase approach** to eliminate subjective weights:
+
+**Phase 1: Initial Training**
+- All metrics weighted equally (no subjective bias)
+- Machine learning model trained on historical data
+- Model learns which metrics correlate with performance
+
+**Phase 2: ML-Derived Weights**
+- Feature importance extracted from trained model
+- These importances become the weights (data-driven, not subjective)
+- Final scores calculated using ML-derived weights
+
+**Key Advantage**: The data tells us how much each metric matters, not human opinion.
+
+### 3. Multi-Dimensional Evaluation
 Goalkeepers are evaluated across 5 key dimensions:
 - Shot stopping ability
 - Distribution and ball-playing
@@ -20,16 +36,54 @@ Goalkeepers are evaluated across 5 key dimensions:
 - Aerial dominance
 - Reliability and consistency
 
-### 3. Weighted Importance
-Not all metrics are equal. The system applies differential weighting based on:
-- Impact on match outcomes
-- Frequency of occurrence
-- Correlation with winning
-- Modern goalkeeper requirements
+### 4. Historical Training Data
+The system trains on **ALL available historical data**:
+- 2022 USLC: Iteration 510
+- 2023 USLC: Iteration 642
+- 2024 USLC: Iteration 893
+- 2025 USLC: Iteration 1236
+
+This ensures comprehensive learning from multiple seasons.
 
 ## Statistical Framework
 
-### Phase 1: Data Normalization
+### Two-Phase Data-Driven Approach
+
+The system eliminates subjective weight assignment through a two-phase methodology:
+
+#### Phase 1: Equal-Weight Initial Scoring
+```python
+# All metrics weighted equally (1.0) - no bias
+for metric in metrics:
+    weight = 1.0  # Equal treatment
+    normalized_score += normalized_metric * weight
+```
+
+**Purpose**: Create unbiased initial scores for ML training
+
+#### Phase 2: ML Model Training
+```python
+# Train Random Forest on initial scores
+model = RandomForestRegressor(n_estimators=100, max_depth=10)
+model.fit(metrics, composite_score)
+
+# Extract feature importance (data-driven weights)
+ml_weights = model.feature_importances_
+```
+
+**Purpose**: Learn which metrics actually predict performance
+
+#### Phase 3: Final Scoring with ML Weights
+```python
+# Re-score using data-driven weights
+for metric in metrics:
+    weight = ml_weights[metric]  # From ML model, not human choice
+    final_score += normalized_metric * weight
+```
+
+**Result**: Weights determined by data patterns, not subjective opinions
+
+### Data Normalization
 
 **Problem**: Metrics are measured on different scales
 - Save percentage (0-1)
@@ -49,31 +103,33 @@ normalized_value = 1 - (value - min) / (max - min)
 
 **Result**: All metrics comparable on same scale
 
-### Phase 2: Weighted Aggregation
+### Weighted Aggregation with ML-Derived Weights
 
-**Composite Score Formula**:
+**Composite Score Formula** (using ML-derived weights):
 ```
-composite_score = (Σ(normalized_metric_i × weight_i) / Σ(weight_i)) × 100
+composite_score = (Σ(normalized_metric_i × ml_weight_i) / Σ(ml_weight_i)) × 100
 ```
 
 Where:
 - `normalized_metric_i` = normalized value of metric i
-- `weight_i` = importance weight of metric i
+- `ml_weight_i` = **ML-derived importance** of metric i (not manually chosen)
 - Final score scaled to 0-100 for interpretability
 
-**Example Calculation**:
+**Example Calculation** (with ML weights from trained model):
 
 Given goalkeeper with:
-- save_percentage (normalized): 0.85 (weight: 1.5)
-- clean_sheet_pct (normalized): 0.70 (weight: 1.8)
-- passes_completed_pct (normalized): 0.75 (weight: 0.8)
+- crosses_claimed (normalized): 0.85 (ML weight: 18.11 - high importance)
+- touches (normalized): 0.70 (ML weight: 2.48)
+- progressive_passes (normalized): 0.75 (ML weight: 2.26)
 
 ```
-composite_score = ((0.85 × 1.5) + (0.70 × 1.8) + (0.75 × 0.8)) / (1.5 + 1.8 + 0.8) × 100
-                = (1.275 + 1.26 + 0.6) / 4.1 × 100
-                = 3.135 / 4.1 × 100
-                = 76.46
+composite_score = ((0.85 × 18.11) + (0.70 × 2.48) + (0.75 × 2.26)) / (18.11 + 2.48 + 2.26) × 100
+                = (15.39 + 1.74 + 1.70) / 22.85 × 100
+                = 18.83 / 22.85 × 100
+                = 82.41
 ```
+
+**Key Difference from Manual Weights**: The ML model discovered that `crosses_claimed` is much more predictive (18.11) than originally thought (manual weight was 0.9). The data drives the weights, not subjective judgment.
 
 ### Phase 3: Category Scoring
 

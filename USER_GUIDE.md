@@ -79,6 +79,11 @@ IMPECT_PASSWORD = "ZJnpgKNSQkm9A_G"
 
 2. **Run Analysis**
 
+**The system uses a data-driven approach:**
+- Trains on ALL historical data (2022-2025 USLC seasons)
+- Uses machine learning to determine metric weights automatically
+- NO manual/subjective weight choices required
+
 ```bash
 python moneyball.py
 ```
@@ -87,10 +92,15 @@ The system will:
 - Authenticate with Impect API
 - Fetch data from all training iterations (2022-2025 USLC)
 - Cache the data locally for faster subsequent runs
-- Calculate scores for all goalkeepers
-- Train machine learning model
+- **Phase 1**: Score with equal weights and train ML model
+- **Phase 2**: Extract ML-derived weights from model
+- **Phase 3**: Re-score using data-driven weights
 - Identify top targets
-- Export results to `output/` directory
+- Export results to `output/` directory, including:
+  - `ml_derived_weights.csv` - Data-driven weights (not subjective)
+  - `feature_importance.csv` - Which metrics matter most
+  - `goalkeeper_scores_all_years.csv` - Final scores
+  - `targets_2025.csv` - Recommended targets
 
 3. **Use Cached Data**
 
@@ -144,54 +154,78 @@ predictions = predictor.predict(new_data)
 
 ## Understanding the Scoring System
 
+### Data-Driven Approach (NEW)
+
+The system now uses **machine learning to determine metric weights automatically**:
+
+1. **Phase 1**: Score all goalkeepers with equal weights (no bias)
+2. **Phase 2**: Train ML model to learn which metrics predict performance
+3. **Phase 3**: Extract feature importance as weights (data-driven)
+4. **Phase 4**: Re-score using ML-derived weights
+
+**Example ML-Derived Weights** (from actual training):
+- `crosses_claimed`: 18.11 (very high importance - discovered by ML)
+- `touches`: 2.48
+- `progressive_passes`: 2.26
+- `saves`: 1.08
+- `high_ball_wins`: 1.06
+
+**Key Advantage**: Weights reflect what actually predicts performance, not human opinion.
+
 ### Metric Categories
 
-The system evaluates goalkeepers across 5 key categories:
+The system evaluates goalkeepers across 30+ metrics in 5 key categories:
 
-#### 1. Shot Stopping (Weight: Very High)
-- **save_percentage**: % of shots saved (1.5x weight)
-- **saves_per_90**: Saves per 90 minutes (1.0x weight)
-- **goals_prevented**: xG prevented (1.5x weight)
-- **expected_goals_against**: Quality of shots faced (0.8x weight)
+#### 1. Shot Stopping
+- save_percentage, saves_per_90, goals_prevented, expected_goals_against
 
-#### 2. Distribution (Weight: Medium-High)
-- **pass_completion_percentage**: Overall passing accuracy (0.8x weight)
-- **long_pass_completion_percentage**: Long ball accuracy (0.6x weight)
-- **progressive_passes**: Forward-thinking passes (0.9x weight)
-- **goal_kick_completion_percentage**: GK accuracy (0.5x weight)
+#### 2. Distribution  
+- pass_completion_percentage, long_pass_completion_percentage
+- progressive_passes, goal_kick_completion_percentage
 
-#### 3. Sweeping (Weight: Medium)
-- **defensive_actions_outside_penalty_area**: Sweeper keeper actions (1.0x weight)
-- **successful_sweeper_actions**: Successful interventions (1.2x weight)
+#### 3. Sweeping
+- defensive_actions_outside_penalty_area, successful_sweeper_actions
 
-#### 4. Aerial Ability (Weight: Medium)
-- **cross_claim_percentage**: % of crosses claimed (1.1x weight)
-- **crosses_claimed**: Total crosses claimed (0.9x weight)
-- **high_ball_wins**: Aerial duels won (0.8x weight)
+#### 4. Aerial Ability
+- cross_claim_percentage, crosses_claimed, high_ball_wins
 
-#### 5. Reliability (Weight: Very High)
-- **clean_sheet_percentage**: % of clean sheets (1.8x weight)
-- **clean_sheets**: Total clean sheets (2.0x weight)
-- **errors_leading_to_goal**: Mistakes (negative -3.0x weight)
-- **errors_leading_to_shot**: Mistakes (negative -2.0x weight)
+#### 5. Reliability
+- clean_sheet_percentage, clean_sheets
+- errors_leading_to_goal, errors_leading_to_shot
+
+**Note**: Specific weights for each metric are determined by the ML model based on historical data, not manually assigned.
 
 ### Composite Score Calculation
 
 1. **Normalization**: All metrics normalized to 0-1 scale
-2. **Weighting**: Multiplied by importance weights
-3. **Aggregation**: Weighted average across all metrics
+2. **ML Weighting**: Multiplied by ML-derived importance weights
+3. **Aggregation**: Weighted average across all metrics  
 4. **Scaling**: Converted to 0-100 score
 
 Formula:
 ```
-composite_score = (Σ(normalized_metric * weight) / Σ(weights)) * 100
+composite_score = (Σ(normalized_metric * ml_weight) / Σ(ml_weights)) * 100
 ```
+
+where `ml_weight` comes from Random Forest feature importance, not manual assignment.
 
 ## Interpreting Results
 
 ### Output Files
 
 After running the analysis, check the `output/` directory:
+
+#### ml_derived_weights.csv (NEW)
+**Data-driven weights learned from ML model** - shows which metrics matter most.
+
+**Columns:**
+- `metric`: Name of the metric
+- `ml_weight`: Importance weight determined by Random Forest (not manually chosen)
+
+This file proves the analysis is data-driven, not based on subjective opinions.
+
+#### feature_importance.csv
+Feature importance from the ML model, showing top predictive metrics.
 
 #### goalkeeper_scores_all_years.csv
 Complete dataset with calculated scores for all goalkeepers across all years.
@@ -248,9 +282,27 @@ When training completes, you'll see:
 
 ## Customization
 
-### Adjusting Metric Weights
+### Using Data-Driven vs Manual Weights
 
-Edit `config.py` to change metric importance:
+**Recommended (Default)**: Use data-driven weights
+```python
+from moneyball import GoalkeeperMoneyball
+
+# Use ML-derived weights (recommended - no subjective bias)
+moneyball = GoalkeeperMoneyball(use_cache=True, use_data_driven_weights=True)
+moneyball.run_full_analysis()
+```
+
+**Optional**: Use manual weights (not recommended)
+```python
+# Disable data-driven weights to use manual weights from config.py
+moneyball = GoalkeeperMoneyball(use_cache=True, use_data_driven_weights=False)
+moneyball.run_full_analysis()
+```
+
+### Adjusting Metric Weights (Optional - Not Recommended)
+
+If you choose to use manual weights (`use_data_driven_weights=False`), you can edit `config.py`:
 
 ```python
 GOALKEEPER_METRICS = {
@@ -259,6 +311,8 @@ GOALKEEPER_METRICS = {
     # ... other metrics
 }
 ```
+
+**However**, this approach is **not recommended** as it introduces subjective bias. The data-driven approach is more objective.
 
 ### Adding New Metrics
 

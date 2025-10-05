@@ -18,7 +18,9 @@ TRAINING_ITERATIONS = {
 GOALKEEPER_POSITIONS = ['GK', 'Goalkeeper', 'G']
 
 # Key goalkeeper metrics for mathematical analysis
-# All metrics are objective and quantifiable
+# NOTE: These manual weights are now OPTIONAL and not used by default.
+# The system uses data-driven ML-derived weights instead (recommended).
+# Manual weights kept here for reference and backwards compatibility.
 GOALKEEPER_METRICS = {
     # Shot stopping
     'saves': 1.0,

@@ -19,15 +19,23 @@ class GoalkeeperScorer:
     Based purely on statistical metrics, no subjective evaluation
     """
     
-    def __init__(self, metric_weights: Dict[str, float] = None):
+    def __init__(self, metric_weights: Dict[str, float] = None, use_equal_weights: bool = False):
         """
         Initialize the scorer
         
         Args:
             metric_weights: Dictionary mapping metric names to their weights
-                          (defaults to config.GOALKEEPER_METRICS)
+                          (defaults to config.GOALKEEPER_METRICS for initial scoring,
+                           or can be ML-derived weights for final scoring)
+            use_equal_weights: If True, use equal weights (1.0) for all metrics.
+                             Useful for initial training before ML weights are learned.
         """
-        self.metric_weights = metric_weights or GOALKEEPER_METRICS
+        if use_equal_weights:
+            # Use equal weights for initial scoring to train ML model
+            self.metric_weights = {k: 1.0 for k in GOALKEEPER_METRICS.keys()}
+            logger.info("Using equal weights for all metrics (data-driven approach)")
+        else:
+            self.metric_weights = metric_weights or GOALKEEPER_METRICS
         self.available_metrics = []
         self.normalized_stats = None
     
@@ -64,8 +72,14 @@ class GoalkeeperScorer:
                 normalized_data[f'{metric}_normalized'] = 0.5
                 continue
             
-            # For negative-weighted metrics (like goals conceded), invert the scale
-            if self.metric_weights[metric] < 0:
+            # Determine if metric should be inverted based on naming convention
+            # Metrics with negative connotations should be inverted (lower is better)
+            negative_metrics = [
+                'goals_conceded', 'goals_conceded_per_90', 'errors_leading_to_shot',
+                'errors_leading_to_goal', 'penalties_conceded', 'shots_on_target_against'
+            ]
+            
+            if metric in negative_metrics:
                 # Lower is better, so invert
                 min_val = values.min()
                 max_val = values.max()
@@ -104,7 +118,7 @@ class GoalkeeperScorer:
         for metric in self.available_metrics:
             normalized_col = f'{metric}_normalized'
             if normalized_col in data.columns:
-                weight = abs(self.metric_weights[metric])
+                weight = abs(self.metric_weights.get(metric, 1.0))
                 weighted_sum += data[normalized_col] * weight
                 total_weight += weight
         
