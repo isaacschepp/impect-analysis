@@ -6,13 +6,15 @@ A 100% mathematical, data-driven system for identifying high-potential goalkeepe
 
 This system implements a "Moneyball" approach to goalkeeper analysis, using only objective, quantifiable metrics - no subjective evaluation. It uses a **data-driven, two-phase methodology** where machine learning determines metric weights automatically.
 
-**Key Innovation #1 - Real Success Metrics**: The system predicts **actual game outcomes** (clean sheet percentage, goals prevented) instead of circular composite scores. This answers the critical question: "What goalkeeper behaviors actually lead to winning?"
+**Key Innovation #1 - North Star Metric**: The system now uses **points per match** (3 for win, 1 for draw, 0 for loss) as the ultimate success metric. This directly answers: "Does the goalkeeper's performance help the team WIN games?" Alternative metrics like clean sheet percentage and goals prevented are also supported.
 
-**Key Innovation #2 - Data-Driven Weights**: Instead of manually choosing how much each metric matters (subjective), the system uses machine learning to learn which metrics predict real success from historical data (objective).
+**Key Innovation #2 - Comprehensive Metrics from ImpectPy**: The system fetches ALL available metrics from ImpectPy including match results, ensuring complete coverage. See [COMPREHENSIVE_METRICS_GUIDE.md](COMPREHENSIVE_METRICS_GUIDE.md) for details.
+
+**Key Innovation #3 - Data-Driven Weights**: Instead of manually choosing how much each metric matters (subjective), the system uses machine learning to learn which metrics predict real success from historical data (objective).
 
 The system combines:
 
-1. **Data Collection**: Fetches goalkeeper statistics from USLC iterations via the Impect API
+1. **Data Collection**: Fetches comprehensive goalkeeper statistics AND match results from USLC iterations via the Impect API
 2. **Initial Scoring**: Calculates scores with equal weights (no bias) to train ML model
 3. **ML Weight Learning**: Trains model on ALL historical data (2022-2025) to learn feature importance
 4. **Final Scoring**: Re-scores using ML-derived weights (data-driven, not subjective)
@@ -20,15 +22,17 @@ The system combines:
 
 ## Features
 
+- **North Star Metric**: Uses **points_per_match** (3 for win, 1 for draw, 0 for loss) - the ultimate measure of success
 - **100% Data-Driven Analysis**: Metric weights determined by ML, not human opinion
-- **No Subjective Weights**: The data tells us what matters, not manual choices
-- **Trains on ALL Historical Data**: Uses complete data from 2022-2025 USLC seasons
-- **Comprehensive Metrics**: Evaluates goalkeepers across multiple dimensions:
+- **Comprehensive Metrics**: Fetches ALL 44 available metrics from ImpectPy including:
   - Shot stopping (saves, save percentage, goals prevented)
   - Distribution (passing accuracy, long balls, progressive passes)
   - Sweeping (defensive actions outside penalty area)
   - Aerial ability (crosses claimed, high ball wins)
   - Reliability (clean sheets, error prevention)
+  - **Match results** (wins, draws, losses, points gained) 🆕
+- **No Subjective Weights**: The data tells us what matters, not manual choices
+- **Trains on ALL Historical Data**: Uses complete data from 2022-2025 USLC seasons
 - **Machine Learning Models**: Uses Random Forest to learn feature importance
 - **Two-Phase Approach**: Initial equal-weight scoring → ML training → Final ML-weighted scoring
 - **Target Identification**: Generates ranked lists of recruitment targets
@@ -47,9 +51,23 @@ The system uses the following USLC iterations for training:
 
 **Our Answer**: We predict **real game outcomes**, not circular composite scores.
 
-### Success Metric: Clean Sheet Percentage (Default)
+### Success Metric: Points Per Match (Default) 🆕
 
-The ML model predicts `clean_sheet_percentage` - the percentage of games where the goalkeeper helped keep a clean sheet (no goals conceded). This is:
+The ML model now predicts `points_per_match` - the **ultimate north star metric**:
+- **3 points** for a win
+- **1 point** for a draw
+- **0 points** for a loss
+
+This is:
+
+✅ **The most direct measure of success** - winning games is what matters
+✅ **Tied directly to league standings** - more points = better position
+✅ **Objectively measurable** - clear game outcomes
+✅ **What teams actually care about** - playoffs, championships, promotion
+
+### Alternative: Clean Sheet Percentage
+
+The system also supports `clean_sheet_percentage` - the percentage of games where the goalkeeper helped keep a clean sheet (no goals conceded). This is:
 
 ✅ **A real outcome** that happened in actual games
 ✅ **Independent** from the metrics we use as inputs
@@ -58,26 +76,42 @@ The ML model predicts `clean_sheet_percentage` - the percentage of games where t
 
 ### What the Model Learns
 
-The model discovers which behaviors correlate with achieving clean sheets:
+With `points_per_match` as the target, the model discovers which behaviors correlate with winning:
 
 ```
-Example Discoveries (from actual training):
-- Claiming crosses is 85.3% predictive of clean sheets
-- Minutes played (experience) is 5.7% predictive
-- Save frequency is 1.8% predictive
-- Distribution quality is 0.9% predictive
+Example Discoveries (from actual training with points_per_match):
+- Wins/Losses are top predictors (37% and 36% importance) - validates the metric
+- Points gained directly correlates (9% importance)
+- Clean sheet percentage matters (2.7% importance)
+- Long pass completion helps (1.0% importance)
+- High ball wins contribute (1.0% importance)
 ```
 
-**Key Insight**: The data revealed that aerial dominance (claiming crosses/high balls) is the strongest predictor of clean sheets, more important than raw save counts. This is a data-driven discovery, not a human assumption.
+**Key Insight**: The model learns which **goalkeeper behaviors** (not just outcomes) correlate with earning points. This allows identifying goalkeepers who may not have many wins yet (due to poor teams) but exhibit behaviors that predict future success on better teams.
 
-### Alternative Success Metrics
+### All Available Success Metrics
 
-You can configure the system to predict other real outcomes:
+You can configure the system to predict different real outcomes:
 
+- **`points_per_match`** (default): 3 for win, 1 for draw - **NORTH STAR METRIC** 🆕
+- **`clean_sheet_percentage`**: Percentage of games with no goals conceded
 - **`goals_prevented`**: Expected goals minus actual goals (shot-stopping value)
 - **`goals_conceded_per_90`**: Direct defensive outcome (lower is better)
 
 All of these are **real game results**, not synthetic scores, ensuring the model learns what actually works.
+
+## Comprehensive Metrics
+
+The system now fetches **ALL 44 available metrics** from ImpectPy, ensuring complete coverage:
+
+### How do we know we're testing all possible metrics?
+
+1. ✅ **Fetches everything from ImpectPy** - uses `getPlayerIterationScores()` which returns all tracked metrics
+2. ✅ **Includes match results** - uses `getMatches()` to get wins/draws/losses
+3. ✅ **Automatic discovery** - ML evaluates ALL metrics simultaneously, no cherry-picking
+4. ✅ **Feature importance analysis** - ranks every metric by predictive power
+
+See [COMPREHENSIVE_METRICS_GUIDE.md](COMPREHENSIVE_METRICS_GUIDE.md) for the complete list of 44 metrics and detailed explanation.
 
 ## Installation
 

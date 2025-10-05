@@ -122,6 +122,27 @@ def generate_sample_goalkeeper_data(
         clean_sheets = int(clean_sheets)
         clean_sheet_percentage = clean_sheets / matches_played if matches_played > 0 else 0
         
+        # Match results (wins/draws/losses) - correlated with quality and clean sheets
+        # Better goalkeepers should have more wins
+        win_probability = 0.30 + quality_level * 0.30  # Range: 30-60% win rate
+        draw_probability = 0.25 + np.random.uniform(-0.05, 0.05)  # ~25% draw rate
+        
+        wins = 0
+        draws = 0
+        losses = 0
+        
+        for _ in range(int(matches_played)):
+            rand = np.random.random()
+            if rand < win_probability:
+                wins += 1
+            elif rand < win_probability + draw_probability:
+                draws += 1
+            else:
+                losses += 1
+        
+        points_gained = wins * 3 + draws * 1
+        points_per_match = points_gained / matches_played if matches_played > 0 else 0
+        
         errors_leading_to_shot = np.random.poisson((1 - quality_level) * 3)
         errors_leading_to_goal = np.random.poisson((1 - quality_level) * 1.5)
         penalties_conceded = np.random.poisson((1 - quality_level) * 2)
@@ -176,6 +197,14 @@ def generate_sample_goalkeeper_data(
             'errors_leading_to_shot': errors_leading_to_shot,
             'errors_leading_to_goal': errors_leading_to_goal,
             'penalties_conceded': penalties_conceded,
+            
+            # Match results (north star metric)
+            'matches_played_with_result': matches_played,
+            'wins': wins,
+            'draws': draws,
+            'losses': losses,
+            'points_gained': points_gained,
+            'points_per_match': points_per_match,
             
             # General
             'minutes_played': minutes_played,
