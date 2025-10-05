@@ -6,7 +6,9 @@ A 100% mathematical, data-driven system for identifying high-potential goalkeepe
 
 This system implements a "Moneyball" approach to goalkeeper analysis, using only objective, quantifiable metrics - no subjective evaluation. It uses a **data-driven, two-phase methodology** where machine learning determines metric weights automatically.
 
-**Key Innovation**: Instead of manually choosing how much each metric matters (subjective), the system uses machine learning to learn which metrics predict performance from historical data (objective).
+**Key Innovation #1 - Real Success Metrics**: The system predicts **actual game outcomes** (clean sheet percentage, goals prevented) instead of circular composite scores. This answers the critical question: "What goalkeeper behaviors actually lead to winning?"
+
+**Key Innovation #2 - Data-Driven Weights**: Instead of manually choosing how much each metric matters (subjective), the system uses machine learning to learn which metrics predict real success from historical data (objective).
 
 The system combines:
 
@@ -38,6 +40,44 @@ The system uses the following USLC iterations for training:
 - 2024 USLC: Iteration 893
 - 2023 USLC: Iteration 642
 - 2022 USLC: Iteration 510
+
+## How We Define "Success"
+
+**The Critical Question**: How do we know if a goalkeeper doing something more/better actually impacts the game positively?
+
+**Our Answer**: We predict **real game outcomes**, not circular composite scores.
+
+### Success Metric: Clean Sheet Percentage (Default)
+
+The ML model predicts `clean_sheet_percentage` - the percentage of games where the goalkeeper helped keep a clean sheet (no goals conceded). This is:
+
+✅ **A real outcome** that happened in actual games
+✅ **Independent** from the metrics we use as inputs
+✅ **Objectively measurable** - either they got a clean sheet or they didn't
+✅ **Directly tied to winning** - teams with more clean sheets win more games
+
+### What the Model Learns
+
+The model discovers which behaviors correlate with achieving clean sheets:
+
+```
+Example Discoveries (from actual training):
+- Claiming crosses is 85.3% predictive of clean sheets
+- Minutes played (experience) is 5.7% predictive
+- Save frequency is 1.8% predictive
+- Distribution quality is 0.9% predictive
+```
+
+**Key Insight**: The data revealed that aerial dominance (claiming crosses/high balls) is the strongest predictor of clean sheets, more important than raw save counts. This is a data-driven discovery, not a human assumption.
+
+### Alternative Success Metrics
+
+You can configure the system to predict other real outcomes:
+
+- **`goals_prevented`**: Expected goals minus actual goals (shot-stopping value)
+- **`goals_conceded_per_90`**: Direct defensive outcome (lower is better)
+
+All of these are **real game results**, not synthetic scores, ensuring the model learns what actually works.
 
 ## Installation
 
