@@ -21,18 +21,22 @@ class GoalkeeperMoneyball:
     Main class orchestrating the goalkeeper moneyball analysis
     """
     
-    def __init__(self, use_cache: bool = True):
+    def __init__(self, use_cache: bool = True, use_data_driven_weights: bool = True):
         """
         Initialize the moneyball system
         
         Args:
             use_cache: Whether to use cached data
+            use_data_driven_weights: If True, use ML-derived feature importance as weights
+                                    instead of manual subjective weights (recommended)
         """
         self.collector = GoalkeeperDataCollector(use_cache=use_cache)
         self.scorer = GoalkeeperScorer()
         self.predictor = GoalkeeperPredictor()
         self.training_data = None
         self.scored_data = None
+        self.use_data_driven_weights = use_data_driven_weights
+        self.ml_weights = None  # Will store ML-derived weights
         
         # Ensure output directory exists
         os.makedirs(OUTPUT_DIR, exist_ok=True)
@@ -57,9 +61,12 @@ class GoalkeeperMoneyball:
         
         return self.training_data
     
-    def score_goalkeepers(self) -> pd.DataFrame:
+    def score_goalkeepers(self, use_ml_weights: bool = False) -> pd.DataFrame:
         """
         Calculate mathematical scores for all goalkeepers
+        
+        Args:
+            use_ml_weights: If True, use ML-derived weights; if False, use initial weights
         
         Returns:
             DataFrame with scores
@@ -70,6 +77,13 @@ class GoalkeeperMoneyball:
         
         if self.training_data is None:
             self.load_and_prepare_data()
+        
+        if use_ml_weights and self.ml_weights is not None:
+            logger.info("Using ML-derived data-driven weights")
+            self.scorer = GoalkeeperScorer(metric_weights=self.ml_weights)
+        else:
+            logger.info("Using initial weights for ML training")
+            self.scorer = GoalkeeperScorer(use_equal_weights=True)
         
         self.scored_data = self.scorer.score_goalkeepers(self.training_data)
         
@@ -126,6 +140,46 @@ class GoalkeeperMoneyball:
         
         return importance
     
+    def extract_ml_weights(self) -> Dict[str, float]:
+        """
+        Extract ML-derived feature importance as weights for scoring.
+        This replaces subjective manual weights with data-driven weights.
+        
+        Returns:
+            Dictionary mapping metric names to ML-derived importance weights
+        """
+        logger.info("=" * 80)
+        logger.info("EXTRACTING DATA-DRIVEN WEIGHTS FROM ML MODEL")
+        logger.info("=" * 80)
+        
+        if self.predictor.feature_importance is None:
+            raise ValueError("Model must be trained first to extract weights")
+        
+        # Convert feature importance to weights dictionary
+        ml_weights = {}
+        for _, row in self.predictor.feature_importance.iterrows():
+            feature = row['feature']
+            importance = row['importance']
+            ml_weights[feature] = float(importance)
+        
+        # Normalize weights to sum to a reasonable scale (similar to manual weights)
+        # This maintains interpretability while being data-driven
+        total_importance = sum(ml_weights.values())
+        if total_importance > 0:
+            # Scale to match the scale of manual weights (roughly 30-40 total)
+            target_total = 35.0
+            scale_factor = target_total / total_importance
+            ml_weights = {k: v * scale_factor for k, v in ml_weights.items()}
+        
+        logger.info(f"Extracted {len(ml_weights)} data-driven weights")
+        logger.info("Top 10 ML-derived weights:")
+        sorted_weights = sorted(ml_weights.items(), key=lambda x: x[1], reverse=True)[:10]
+        for metric, weight in sorted_weights:
+            logger.info(f"  {metric}: {weight:.4f}")
+        
+        self.ml_weights = ml_weights
+        return ml_weights
+    
     def identify_top_targets(self, target_year: int = 2025, 
                             n_targets: int = 20) -> pd.DataFrame:
         """
@@ -162,31 +216,60 @@ class GoalkeeperMoneyball:
     
     def generate_report(self) -> Dict:
         """
-        Generate comprehensive analysis report
+        Generate comprehensive analysis report using data-driven methodology
+        
+        If use_data_driven_weights is True (recommended), this uses a two-phase approach:
+        Phase 1: Score with initial weights and train ML model to learn feature importance
+        Phase 2: Re-score using ML-derived weights for final results
         
         Returns:
             Dictionary containing all analysis results
         """
         logger.info("=" * 80)
         logger.info("GENERATING COMPREHENSIVE REPORT")
+        if self.use_data_driven_weights:
+            logger.info("Using DATA-DRIVEN methodology (ML-derived weights)")
+        else:
+            logger.info("Using MANUAL weights")
         logger.info("=" * 80)
         
         report = {
             'training_metrics': {},
             'feature_importance': None,
+            'ml_weights': None,
             'top_performers_by_year': {},
             'targets_2025': None
         }
         
-        # Load and score data
+        # Load data
         self.load_and_prepare_data()
-        self.score_goalkeepers()
         
-        # Train model
-        report['training_metrics'] = self.train_model()
-        
-        # Feature importance
-        report['feature_importance'] = self.analyze_feature_importance()
+        if self.use_data_driven_weights:
+            # PHASE 1: Initial scoring with equal weights to train ML model
+            logger.info("\n" + "=" * 80)
+            logger.info("PHASE 1: Initial scoring to train ML model")
+            logger.info("=" * 80)
+            self.score_goalkeepers(use_ml_weights=False)
+            
+            # Train model to learn feature importance
+            report['training_metrics'] = self.train_model()
+            
+            # Extract data-driven weights from ML model
+            report['ml_weights'] = self.extract_ml_weights()
+            
+            # PHASE 2: Re-score using ML-derived weights
+            logger.info("\n" + "=" * 80)
+            logger.info("PHASE 2: Final scoring with data-driven weights")
+            logger.info("=" * 80)
+            self.score_goalkeepers(use_ml_weights=True)
+            
+            # Feature importance
+            report['feature_importance'] = self.analyze_feature_importance()
+        else:
+            # Traditional approach with manual weights
+            self.score_goalkeepers(use_ml_weights=False)
+            report['training_metrics'] = self.train_model()
+            report['feature_importance'] = self.analyze_feature_importance()
         
         # Top performers by year
         for year in sorted(self.scored_data['year'].unique()):
@@ -220,6 +303,19 @@ class GoalkeeperMoneyball:
                 self.scored_data, 
                 'goalkeeper_scores_all_years.csv'
             )
+        
+        # Export ML-derived weights if available
+        if report.get('ml_weights') is not None:
+            ml_weights_df = pd.DataFrame([
+                {'metric': k, 'ml_weight': v} 
+                for k, v in sorted(report['ml_weights'].items(), 
+                                  key=lambda x: x[1], reverse=True)
+            ])
+            ml_weights_df.to_csv(
+                os.path.join(OUTPUT_DIR, 'ml_derived_weights.csv'),
+                index=False
+            )
+            logger.info(f"ML-derived weights exported (data-driven approach)")
         
         # Export feature importance
         if report['feature_importance'] is not None:
@@ -257,6 +353,9 @@ class GoalkeeperMoneyball:
         logger.info("\n" + "=" * 80)
         logger.info("USLC GOALKEEPER MONEYBALL SYSTEM")
         logger.info("100% Mathematical, Data-Driven Analysis")
+        if self.use_data_driven_weights:
+            logger.info("Using ML-Derived Weights (NO SUBJECTIVE WEIGHTS)")
+        logger.info("Training on ALL historical data: " + ", ".join(map(str, sorted(TRAINING_ITERATIONS.keys()))))
         logger.info("=" * 80 + "\n")
         
         # Generate report
@@ -267,12 +366,19 @@ class GoalkeeperMoneyball:
         
         logger.info("\n" + "=" * 80)
         logger.info("ANALYSIS COMPLETE!")
+        if self.use_data_driven_weights:
+            logger.info("Weights were determined by the data, not subjective choices")
         logger.info("=" * 80 + "\n")
         
         return report
 
 
 if __name__ == "__main__":
-    # Run the analysis
-    moneyball = GoalkeeperMoneyball(use_cache=True)
+    # Run the analysis with data-driven weights (recommended)
+    # This uses ML feature importance instead of manual subjective weights
+    moneyball = GoalkeeperMoneyball(use_cache=True, use_data_driven_weights=True)
     moneyball.run_full_analysis()
+    
+    # To use manual weights instead (not recommended):
+    # moneyball = GoalkeeperMoneyball(use_cache=True, use_data_driven_weights=False)
+    # moneyball.run_full_analysis()

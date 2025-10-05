@@ -4,24 +4,31 @@ A 100% mathematical, data-driven system for identifying high-potential goalkeepe
 
 ## Overview
 
-This system implements a "Moneyball" approach to goalkeeper analysis, using only objective, quantifiable metrics - no subjective evaluation. It combines:
+This system implements a "Moneyball" approach to goalkeeper analysis, using only objective, quantifiable metrics - no subjective evaluation. It uses a **data-driven, two-phase methodology** where machine learning determines metric weights automatically.
+
+**Key Innovation**: Instead of manually choosing how much each metric matters (subjective), the system uses machine learning to learn which metrics predict performance from historical data (objective).
+
+The system combines:
 
 1. **Data Collection**: Fetches goalkeeper statistics from USLC iterations via the Impect API
-2. **Mathematical Scoring**: Calculates composite scores based on weighted performance metrics
-3. **Machine Learning**: Trains predictive models to identify high-potential targets
-4. **Target Identification**: Ranks and recommends goalkeepers for recruitment
+2. **Initial Scoring**: Calculates scores with equal weights (no bias) to train ML model
+3. **ML Weight Learning**: Trains model on ALL historical data (2022-2025) to learn feature importance
+4. **Final Scoring**: Re-scores using ML-derived weights (data-driven, not subjective)
+5. **Target Identification**: Ranks and recommends goalkeepers for recruitment
 
 ## Features
 
-- **100% Objective Analysis**: All metrics are mathematical and quantifiable
+- **100% Data-Driven Analysis**: Metric weights determined by ML, not human opinion
+- **No Subjective Weights**: The data tells us what matters, not manual choices
+- **Trains on ALL Historical Data**: Uses complete data from 2022-2025 USLC seasons
 - **Comprehensive Metrics**: Evaluates goalkeepers across multiple dimensions:
   - Shot stopping (saves, save percentage, goals prevented)
   - Distribution (passing accuracy, long balls, progressive passes)
   - Sweeping (defensive actions outside penalty area)
   - Aerial ability (crosses claimed, high ball wins)
   - Reliability (clean sheets, error prevention)
-- **Machine Learning Models**: Uses Random Forest and Gradient Boosting for predictions
-- **Historical Analysis**: Trains on data from 2022-2025 USLC seasons
+- **Machine Learning Models**: Uses Random Forest to learn feature importance
+- **Two-Phase Approach**: Initial equal-weight scoring → ML training → Final ML-weighted scoring
 - **Target Identification**: Generates ranked lists of recruitment targets
 
 ## Training Data
@@ -47,9 +54,10 @@ pip install -r requirements.txt
 
 Edit `config.py` to update:
 - Impect API credentials
-- Metric weights for scoring
-- Training iterations
+- Training iterations (currently 2022-2025)
 - ML parameters
+
+**Note**: Metric weights are now automatically determined by the ML model (data-driven approach). Manual weights in `config.py` are no longer used by default.
 
 ## Usage
 
