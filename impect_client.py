@@ -58,8 +58,8 @@ class ImpectClient:
         """
         try:
             logger.info(f"Fetching data for iteration {iteration_id}...")
-            # Get player scores for the iteration
-            data = self.client.getPlayerIterationScores(iterationId=iteration_id)
+            # Get player scores for the iteration (all positions)
+            data = self.client.getPlayerIterationScores(iteration=iteration_id, positions=[])
             logger.info(f"Retrieved {len(data)} player records for iteration {iteration_id}")
             return data
         except Exception as e:
@@ -104,8 +104,8 @@ class ImpectClient:
         """
         try:
             match_scores = self.client.getPlayerMatchScores(
-                playerId=player_id,
-                iterationId=iteration_id
+                player=player_id,
+                iteration=iteration_id
             )
             return match_scores
         except Exception as e:
